@@ -1,8 +1,12 @@
+
 import cv2
 import json
 import sys
 import os
-from omr import find_document_contour, four_point_transform, preprocess_image, extract_omr_answers
+import glob
+import numpy as np
+import re
+from omr import find_document_contour, four_point_transform
 from ocr import extract_text_and_boxes
 from translate import translate_text
 import utils
@@ -13,9 +17,14 @@ def load_config():
     with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def process_image(image_path, config):
-    import numpy as np
-    import re
+def to_native(obj):
+    if isinstance(obj, (np.integer, int, float)):
+        return int(obj)
+    elif isinstance(obj, (list, tuple, np.ndarray)):
+        return [to_native(x) for x in obj]
+    return obj
+
+def process_image(image_path, config, translation_engine=None):
     image = utils.load_image(image_path)
     doc_cnt = find_document_contour(image)
     if doc_cnt is not None:
@@ -23,22 +32,18 @@ def process_image(image_path, config):
     else:
         warped = image
     text_blocks = extract_text_and_boxes(warped, config.get('languages', ['ar', 'en']))
-    def to_native(obj):
-        if isinstance(obj, (np.integer, int, float)):
-            return int(obj)
-        elif isinstance(obj, (list, tuple, np.ndarray)):
-            return [to_native(x) for x in obj]
-        return obj
     arabic_blocks = []
     for block in text_blocks:
         text = block['text'].strip()
         arabic_letters = re.findall(r'[\u0600-\u06FF]', text)
         arabic_words = re.findall(r'[\u0600-\u06FF]+', text)
         if len(arabic_words) >= 2 and len(arabic_letters) / max(len(text),1) > 0.6 and len(text) > 4:
+            engine = translation_engine or config.get('translation_engine', 'deep-translator')
             try:
-                translation = translate_text(text, engine='deep-translator')
+                translation = translate_text(text, engine=engine)
             except Exception:
-                translation = translate_text(text, engine='googletrans')
+                fallback = 'googletrans' if engine != 'googletrans' else 'deep-translator'
+                translation = translate_text(text, engine=fallback)
             bbox = block['bbox']
             bbox_py = to_native(bbox)
             arabic_blocks.append({
@@ -48,10 +53,8 @@ def process_image(image_path, config):
             })
     return arabic_blocks
 
-def main(input_path):
+def main(input_path, translation_engine=None):
     config = load_config()
-    import glob
-    import os
     all_results = []
     if os.path.isdir(input_path):
         image_files = []
@@ -60,7 +63,7 @@ def main(input_path):
         image_files.sort()
         for img_path in image_files:
             print(f"\nProcessing: {img_path}\n{'='*40}")
-            arabic_blocks = process_image(img_path, config)
+            arabic_blocks = process_image(img_path, config, translation_engine)
             for item in arabic_blocks:
                 print(f"Arabic: {item['arabic_text']}")
                 print(f"English: {item['english_translation']}")
@@ -72,7 +75,7 @@ def main(input_path):
                 print(f"{item['arabic_text']}")
             all_results.append({'image': img_path, 'results': arabic_blocks})
     else:
-        arabic_blocks = process_image(input_path, config)
+        arabic_blocks = process_image(input_path, config, translation_engine)
         for item in arabic_blocks:
             print(f"Arabic: {item['arabic_text']}")
             print(f"English: {item['english_translation']}")
@@ -87,6 +90,9 @@ def main(input_path):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print('Usage: python main.py <image_path>')
+        print('Usage: python main.py <image_or_folder_path> [translation_engine]')
+        print('translation_engine: deep-translator (default) or googletrans')
         sys.exit(1)
-    main(sys.argv[1])
+    input_path = sys.argv[1]
+    translation_engine = sys.argv[2] if len(sys.argv) > 2 else None
+    main(input_path, translation_engine)
