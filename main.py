@@ -40,7 +40,11 @@ def main(image_path):
                 'english_translation': translation,
                 'bounding_box': bbox_py
             })
-    print(json.dumps({'extracted_text': results}, ensure_ascii=False, indent=2))
+    for item in results:
+        print(f"Arabic: {item['arabic_text']}")
+        print(f"English: {item['english_translation']}")
+        print(f"Bounding Box: {item['bounding_box']}")
+        print('-' * 40)
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
