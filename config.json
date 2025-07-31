@@ -1,0 +1,10 @@
+{
+  "omr_layout": {
+    "num_questions": 3,
+    "choices_per_question": 4,
+    "bubble_grid": [[100, 200, 400, 600]],
+    "bubble_size": [30, 30]
+  },
+  "languages": ["ar", "en"],
+  "translation_engine": "googletrans"
+}
