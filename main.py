@@ -30,25 +30,38 @@ def main(image_path):
         elif isinstance(obj, (list, tuple, np.ndarray)):
             return [to_native(x) for x in obj]
         return obj
+    import re
+    arabic_blocks = []
     for block in text_blocks:
-        if any('\u0600' <= c <= '\u06FF' for c in block['text']):
-            # Use deep-translator for better translation quality, fallback to googletrans if needed
+        # Remove blocks that are too short, contain no Arabic, or are likely icons/symbols
+        text = block['text'].strip()
+        # Only keep if at least 2 Arabic words and mostly Arabic letters
+        arabic_letters = re.findall(r'[\u0600-\u06FF]', text)
+        arabic_words = re.findall(r'[\u0600-\u06FF]+', text)
+        # Heuristic: at least 2 words, at least 60% of chars are Arabic, and length > 4
+        if len(arabic_words) >= 2 and len(arabic_letters) / max(len(text),1) > 0.6 and len(text) > 4:
             try:
-                translation = translate_text(block['text'], engine='deep-translator')
+                translation = translate_text(text, engine='deep-translator')
             except Exception:
-                translation = translate_text(block['text'], engine='googletrans')
+                translation = translate_text(text, engine='googletrans')
             bbox = block['bbox']
             bbox_py = to_native(bbox)
-            results.append({
-                'arabic_text': block['text'],
+            arabic_blocks.append({
+                'arabic_text': text,
                 'english_translation': translation,
                 'bounding_box': bbox_py
             })
-    for item in results:
+    # Print detailed info as before
+    for item in arabic_blocks:
         print(f"Arabic: {item['arabic_text']}")
         print(f"English: {item['english_translation']}")
         print(f"Bounding Box: {item['bounding_box']}")
         print('-' * 40)
+    # Print clean line-by-line translation as requested
+    print("\nLine by line translation:\n")
+    for idx, item in enumerate(arabic_blocks, 1):
+        print(f"{idx}. {item['english_translation']}")
+        print(f"{item['arabic_text']}")
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
