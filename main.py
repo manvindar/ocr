@@ -32,7 +32,11 @@ def main(image_path):
         return obj
     for block in text_blocks:
         if any('\u0600' <= c <= '\u06FF' for c in block['text']):
-            translation = translate_text(block['text'], config.get('translation_engine', 'googletrans'))
+            # Use deep-translator for better translation quality, fallback to googletrans if needed
+            try:
+                translation = translate_text(block['text'], engine='deep-translator')
+            except Exception:
+                translation = translate_text(block['text'], engine='googletrans')
             bbox = block['bbox']
             bbox_py = to_native(bbox)
             results.append({
