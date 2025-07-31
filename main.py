@@ -23,14 +23,22 @@ def main(image_path):
         warped = image
     text_blocks = extract_text_and_boxes(warped, config.get('languages', ['ar', 'en']))
     results = []
+    import numpy as np
+    def to_native(obj):
+        if isinstance(obj, (np.integer, int, float)):
+            return int(obj)
+        elif isinstance(obj, (list, tuple, np.ndarray)):
+            return [to_native(x) for x in obj]
+        return obj
     for block in text_blocks:
         if any('\u0600' <= c <= '\u06FF' for c in block['text']):
             translation = translate_text(block['text'], config.get('translation_engine', 'googletrans'))
             bbox = block['bbox']
+            bbox_py = to_native(bbox)
             results.append({
                 'arabic_text': block['text'],
                 'english_translation': translation,
-                'bounding_box': bbox
+                'bounding_box': bbox_py
             })
     print(json.dumps({'extracted_text': results}, ensure_ascii=False, indent=2))
 
