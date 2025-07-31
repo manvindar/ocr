@@ -21,27 +21,18 @@ def main(image_path):
         warped = four_point_transform(image, doc_cnt)
     else:
         warped = image
-    processed = preprocess_image(warped)
-    omr_results = extract_omr_answers(processed, config)
     text_blocks = extract_text_and_boxes(warped, config.get('languages', ['ar', 'en']))
-    questions = []
-    q_num = 1
+    results = []
     for block in text_blocks:
         if any('\u0600' <= c <= '\u06FF' for c in block['text']):
             translation = translate_text(block['text'], config.get('translation_engine', 'googletrans'))
             bbox = block['bbox']
-            questions.append({
-                'question_number': q_num,
+            results.append({
                 'arabic_text': block['text'],
                 'english_translation': translation,
                 'bounding_box': bbox
             })
-            q_num += 1
-    output = {
-        'omr_results': omr_results,
-        'extracted_questions': questions
-    }
-    print(json.dumps(output, ensure_ascii=False, indent=2))
+    print(json.dumps({'extracted_text': results}, ensure_ascii=False, indent=2))
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
